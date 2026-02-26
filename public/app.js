@@ -869,8 +869,19 @@ function buildShowcaseCard(item) {
   badge.className = "showcase-grid-badge";
   badge.textContent = `${g}x${g}`;
 
+  // Animated GIF layer (hidden by default, shown on hover)
+  const animImg = document.createElement("img");
+  animImg.className = "showcase-gif-anim";
+  animImg.alt = "";
+  if (gifSrc) animImg.src = gifSrc;
+
   imgWrap.appendChild(canvas);
+  imgWrap.appendChild(animImg);
   imgWrap.appendChild(badge);
+
+  // Hover to animate
+  card.addEventListener("mouseenter", () => { animImg.style.opacity = "1"; });
+  card.addEventListener("mouseleave", () => { animImg.style.opacity = "0"; });
 
   const label = document.createElement("p");
   label.textContent = (item.prompt || "").split(/\s+/).slice(0, 6).join(" ");
