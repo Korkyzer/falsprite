@@ -103,6 +103,7 @@ function wireEvents() {
   elements.imageFileInput.addEventListener("change", onImageSelected);
   elements.removeImageButton.addEventListener("click", onRemoveImage);
   elements.gridSelect.addEventListener("change", onGridChange);
+  elements.previewCanvas.addEventListener("click", onPreviewClick);
   elements.apiKeyInput.addEventListener("change", () => {
     const val = elements.apiKeyInput.value.trim();
     if (val) {
@@ -279,6 +280,46 @@ function randomPrompt() {
 
 function onSurprise() {
   elements.promptInput.value = randomPrompt();
+}
+
+function onPreviewClick() {
+  if (!state.preview.image) return;
+
+  const existing = document.getElementById("showcaseOverlay");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "showcaseOverlay";
+  overlay.className = "showcase-overlay";
+
+  const inner = document.createElement("div");
+  inner.className = "showcase-overlay-inner";
+  inner.style.maxWidth = "700px";
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "showcase-overlay-close";
+  closeBtn.textContent = "\u00d7";
+  closeBtn.addEventListener("click", (e) => { e.stopPropagation(); overlay.remove(); });
+
+  const img = document.createElement("img");
+  img.src = state.preview.objectUrl;
+  img.alt = "Full sprite sheet";
+
+  const g = state.current.gridSize;
+  const info = document.createElement("div");
+  info.className = "showcase-overlay-info";
+  info.innerHTML = `<span class="showcase-overlay-badge">${g}x${g}</span><span class="showcase-overlay-prompt">${state.current.promptRewritten.split(/\s+/).slice(0, 12).join(" ")}</span>`;
+
+  inner.appendChild(closeBtn);
+  inner.appendChild(img);
+  inner.appendChild(info);
+  overlay.appendChild(inner);
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  document.body.appendChild(overlay);
 }
 
 function onTogglePlay() {
@@ -805,18 +846,30 @@ function buildShowcaseCard(item) {
   const imgWrap = document.createElement("div");
   imgWrap.className = "showcase-img-wrap";
 
-  const img = document.createElement("img");
-  img.className = "showcase-gif";
-  img.loading = "lazy";
-  img.alt = (item.prompt || "").split(/\s+/).slice(0, 6).join(" ");
-  img.src = item.gifUrl || item.spriteUrl;
+  // Static thumbnail: draw first frame of GIF onto canvas
+  const canvas = document.createElement("canvas");
+  canvas.className = "showcase-gif";
+  canvas.width = 200;
+  canvas.height = 200;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#16161e";
+  ctx.fillRect(0, 0, 200, 200);
+
+  const gifSrc = item.gifUrl || "";
+  if (gifSrc) {
+    const tempImg = new Image();
+    tempImg.onload = () => {
+      ctx.drawImage(tempImg, 0, 0, 200, 200);
+    };
+    tempImg.src = gifSrc;
+  }
 
   const g = item.gridSize || 4;
   const badge = document.createElement("span");
   badge.className = "showcase-grid-badge";
   badge.textContent = `${g}x${g}`;
 
-  imgWrap.appendChild(img);
+  imgWrap.appendChild(canvas);
   imgWrap.appendChild(badge);
 
   const label = document.createElement("p");

@@ -581,6 +581,7 @@ button:disabled {
   width: 100%;
   height: auto;
   image-rendering: pixelated;
+  cursor: pointer;
 }
 
 /* ── canvas loader ─────────────────────────── */
