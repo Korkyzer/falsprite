@@ -848,6 +848,8 @@ input[type="range"]::-moz-range-thumb {
   object-fit: contain;
   border-radius: var(--r-sm);
   image-rendering: pixelated;
+  background: var(--bg);
+  border: 1px solid var(--border);
   opacity: 0;
   transition: opacity 0.15s ease;
   pointer-events: none;
