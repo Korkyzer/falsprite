@@ -911,16 +911,50 @@ function openShowcaseOverlay(item) {
   closeBtn.textContent = "\u00d7";
   closeBtn.addEventListener("click", (e) => { e.stopPropagation(); overlay.remove(); });
 
-  const img = document.createElement("img");
-  img.src = gifSrc;
-  img.alt = prompt;
+  // Static canvas (first frame) + animated GIF on hover
+  const imgWrapEl = document.createElement("div");
+  imgWrapEl.className = "showcase-overlay-img-wrap";
+
+  const staticCanvas = document.createElement("canvas");
+  staticCanvas.className = "showcase-overlay-static";
+  staticCanvas.width = 460;
+  staticCanvas.height = 460;
+  const sCtx = staticCanvas.getContext("2d");
+  sCtx.fillStyle = "#16161e";
+  sCtx.fillRect(0, 0, 460, 460);
+
+  const animImg = document.createElement("img");
+  animImg.className = "showcase-overlay-anim";
+  animImg.alt = prompt;
+
+  // Load first frame into canvas, keep GIF src ready
+  const tempImg = new Image();
+  tempImg.onload = () => {
+    sCtx.drawImage(tempImg, 0, 0, 460, 460);
+  };
+  tempImg.src = gifSrc;
+
+  imgWrapEl.appendChild(staticCanvas);
+  imgWrapEl.appendChild(animImg);
+
+  // Hover: show animated GIF, unhover: show static
+  imgWrapEl.addEventListener("mouseenter", () => {
+    animImg.src = gifSrc;
+    animImg.style.opacity = "1";
+    staticCanvas.style.opacity = "0";
+  });
+  imgWrapEl.addEventListener("mouseleave", () => {
+    animImg.style.opacity = "0";
+    staticCanvas.style.opacity = "1";
+    animImg.src = "";
+  });
 
   const info = document.createElement("div");
   info.className = "showcase-overlay-info";
   info.innerHTML = `<span class="showcase-overlay-badge">${g}x${g}</span><span class="showcase-overlay-prompt">${prompt}</span>`;
 
   inner.appendChild(closeBtn);
-  inner.appendChild(img);
+  inner.appendChild(imgWrapEl);
   inner.appendChild(info);
   overlay.appendChild(inner);
 
