@@ -825,7 +825,57 @@ function buildShowcaseCard(item) {
   card.appendChild(imgWrap);
   card.appendChild(label);
 
+  card.addEventListener("click", () => openShowcaseOverlay(item));
+
   return card;
+}
+
+function openShowcaseOverlay(item) {
+  const existing = document.getElementById("showcaseOverlay");
+  if (existing) existing.remove();
+
+  const g = item.gridSize || 4;
+  const gifSrc = item.gifUrl || "";
+  const prompt = item.prompt || "";
+
+  // Set hero image
+  const heroImg = document.getElementById("heroImage");
+  if (heroImg && gifSrc) {
+    heroImg.src = gifSrc;
+    heroImg.classList.add("is-visible");
+  }
+
+  // Create overlay
+  const overlay = document.createElement("div");
+  overlay.id = "showcaseOverlay";
+  overlay.className = "showcase-overlay";
+
+  const inner = document.createElement("div");
+  inner.className = "showcase-overlay-inner";
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "showcase-overlay-close";
+  closeBtn.textContent = "\u00d7";
+  closeBtn.addEventListener("click", (e) => { e.stopPropagation(); overlay.remove(); });
+
+  const img = document.createElement("img");
+  img.src = gifSrc;
+  img.alt = prompt;
+
+  const info = document.createElement("div");
+  info.className = "showcase-overlay-info";
+  info.innerHTML = `<span class="showcase-overlay-badge">${g}x${g}</span><span class="showcase-overlay-prompt">${prompt}</span>`;
+
+  inner.appendChild(closeBtn);
+  inner.appendChild(img);
+  inner.appendChild(info);
+  overlay.appendChild(inner);
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  document.body.appendChild(overlay);
 }
 
 initShowcase();

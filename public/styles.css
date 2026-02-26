@@ -198,6 +198,31 @@ body::before {
     linear-gradient(175deg, #16161e 0%, #1e1e28 100%);
 }
 
+.hero-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  image-rendering: pixelated;
+}
+
+.hero-image.is-visible {
+  opacity: 0.45;
+}
+
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg,
+    rgba(22, 22, 30, 0.2) 0%,
+    rgba(22, 22, 30, 0.7) 60%,
+    rgba(22, 22, 30, 0.95) 100%);
+  z-index: 1;
+}
+
 .hero-scanlines {
   position: absolute;
   inset: 0;
@@ -839,6 +864,96 @@ input[type="range"]::-moz-range-thumb {
   font-size: 0.62rem;
   color: var(--text-muted);
   line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── showcase overlay ─────────────────────── */
+
+.showcase-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50000;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: showcaseFadeIn 0.2s ease;
+  cursor: pointer;
+}
+
+@keyframes showcaseFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.showcase-overlay-inner {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 520px;
+  cursor: default;
+}
+
+.showcase-overlay-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.6rem;
+  cursor: pointer;
+  z-index: 2;
+  padding: 0;
+  line-height: 1;
+}
+
+.showcase-overlay-close:hover {
+  color: var(--accent);
+}
+
+.showcase-overlay img {
+  display: block;
+  width: 100%;
+  max-width: 460px;
+  height: auto;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  image-rendering: pixelated;
+}
+
+.showcase-overlay-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.showcase-overlay-badge {
+  background: var(--accent);
+  color: #fff;
+  font-family: "Silkscreen", cursive;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--r-sm);
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+.showcase-overlay-prompt {
+  font-size: 0.72rem;
+  color: var(--text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
