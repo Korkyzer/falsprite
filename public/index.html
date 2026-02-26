@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FalSprite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="loader" class="loader">
+      <div class="loader-inner">
+        <span class="loader-brand">FalSprite</span>
+        <div class="loader-blocks">
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="noise" aria-hidden="true"></div>
+
+    <nav class="topbar">
+      <div class="topbar-brand">
+        <span class="brand-mark">FalSprite</span>
+      </div>
+      <div class="topbar-key-wrap">
+        <div class="topbar-key">
+          <span class="key-icon">&#x1f511;</span>
+          <input
+            id="apiKeyInput"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="paste your fal.ai API key"
+          />
+          <span id="keySaved" class="key-saved hidden">saved</span>
+        </div>
+        <a class="key-help" href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener">get your key at fal.ai/dashboard/keys</a>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="hero-scanlines" aria-hidden="true"></div>
+      <div class="hero-content">
+        <h1>FalSprite</h1>
+        <p class="hero-sub">game-ready sprite animations from a single prompt</p>
+        <p class="hero-tech">powered by nano-banana-2 &middot; BRIA bg removal &middot; OpenRouter LLM &mdash; all on fal.ai, one key</p>
+      </div>
+      <div class="hero-badge" aria-hidden="true">
+        <span id="heroBadgeGrid">4x4</span>
+        <span>2K</span>
+        <span>PNG</span>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="prompt-section">
+        <div class="prompt-box">
+          <span class="prompt-caret" aria-hidden="true">&rsaquo;</span>
+          <input
+            id="promptInput"
+            type="text"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="describe your character..."
+          />
+          <input id="imageFileInput" type="file" accept="image/*" hidden />
+          <button id="importButton" class="btn-ghost" title="Import reference image">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+          </button>
+          <button id="surpriseButton" class="btn-ghost" title="Random prompt">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="16" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="16" r="1.5" fill="currentColor"/><circle cx="16" cy="16" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
+          </button>
+          <select id="gridSelect" class="grid-select" title="Grid size">
+            <option value="2">2x2</option>
+            <option value="3">3x3</option>
+            <option value="4" selected>4x4</option>
+            <option value="5">5x5</option>
+            <option value="6">6x6</option>
+          </select>
+          <button id="generateButton" class="btn-primary">GENERATE</button>
+        </div>
+        <div class="action-chips">
+          <span class="action-label">actions</span>
+          <span id="actionCounter" class="action-counter">0/4 rows</span>
+          <button class="action-chip is-active" data-action="">auto</button>
+          <button class="action-chip" data-action="idle breathing loop">idle</button>
+          <button class="action-chip" data-action="walk cycle">walk</button>
+          <button class="action-chip" data-action="run cycle">run</button>
+          <button class="action-chip" data-action="attack combo">attack</button>
+          <button class="action-chip" data-action="spell casting">cast</button>
+          <button class="action-chip" data-action="jump and land">jump</button>
+          <button class="action-chip" data-action="dance loop">dance</button>
+          <button class="action-chip" data-action="death and collapse">death</button>
+          <button class="action-chip" data-action="dodge and roll">dodge</button>
+          <input id="customAction" class="action-custom" type="text" placeholder="+ custom action..." spellcheck="false" />
+        </div>
+        <div id="imagePreview" class="image-preview hidden">
+          <img id="imagePreviewImg" src="" alt="Reference" />
+          <button id="removeImageButton" class="btn-ghost" title="Remove image">&times;</button>
+        </div>
+        <p id="statusText" class="status">ready</p>
+      </section>
+
+      <section id="resultSection" class="result hidden">
+        <div class="preview-col">
+          <div class="canvas-wrap">
+            <canvas id="previewCanvas" width="640" height="640"></canvas>
+            <div class="canvas-scanlines" aria-hidden="true"></div>
+          </div>
+          <div class="preview-controls">
+            <span id="frameLabel" class="frame-label">frame 1/16</span>
+
+            <label class="fps-ctrl">
+              <span>FPS</span>
+              <input id="fpsInput" type="range" min="6" max="20" value="12" />
+            </label>
+            <button id="playToggle" class="btn-ghost">PAUSE</button>
+          </div>
+        </div>
+
+        <div class="detail-col">
+          <div class="detail-block">
+            <h3>rewritten prompt</h3>
+            <p id="promptText" class="mono-body"></p>
+          </div>
+          <div class="detail-block">
+            <h3>pipeline</h3>
+            <p id="pipelineText" class="mono-body">4&times;4 sheet &middot; 2K resolution &middot; auto bg removal</p>
+            <p id="warningText" class="warning hidden"></p>
+          </div>
+          <div class="dl-row">
+            <button id="downloadSheetButton" class="btn-outline">&darr; Sheet</button>
+            <button id="downloadTransparentButton" class="btn-outline">&darr; Transparent</button>
+            <button id="downloadGifButton" class="btn-primary">&darr; GIF</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="history">
+        <div class="history-head">
+          <h2>recent</h2>
+          <span class="history-sub">this session</span>
+        </div>
+        <div id="historyStrip" class="history-strip"></div>
+      </section>
+
+      <section id="showcaseSection" class="showcase hidden">
+        <div class="showcase-head">
+          <h2>examples</h2>
+          <span class="showcase-sub">see what's possible</span>
+        </div>
+        <div id="showcaseGrid" class="showcase-grid"></div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

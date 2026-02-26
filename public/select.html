@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FalSprite / Select</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #16161e;
+      --surface: #1e1e28;
+      --surface-up: #262632;
+      --border: #2e2e3a;
+      --border-hi: #3a3a48;
+      --text: #dcdce2;
+      --text-dim: #8e8e9a;
+      --text-muted: #4e4e58;
+      --accent: #e8607a;
+      --accent-soft: rgba(232, 96, 122, 0.12);
+      --green: #26a05e;
+      --green-soft: rgba(38, 160, 94, 0.15);
+      --red: #bf3a2a;
+      --red-soft: rgba(191, 58, 42, 0.12);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100vh; }
+
+    body {
+      font-family: "Space Mono", monospace;
+      font-size: 13px;
+      color: var(--text);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection { background: var(--accent); color: #fff; }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 100;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .brand {
+      font-family: "Silkscreen", cursive;
+      font-size: 0.95rem;
+      color: var(--accent);
+      letter-spacing: 0.04em;
+    }
+
+    .brand span {
+      color: var(--text-muted);
+      font-family: "Space Mono", monospace;
+      font-size: 0.7rem;
+      margin-left: 8px;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .count {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      min-width: 100px;
+    }
+
+    button {
+      font-family: "Silkscreen", cursive;
+      font-size: 0.58rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-dim);
+      padding: 8px 14px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    button:hover { border-color: var(--border-hi); color: var(--text); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-save {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .btn-save:hover { filter: brightness(1.15); }
+
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .pagination .page-info {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      min-width: 80px;
+      text-align: center;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--green);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      transition: transform 0.3s ease;
+      z-index: 999;
+    }
+
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+      padding: 16px 20px 40px;
+    }
+
+    .card {
+      position: relative;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: 6px;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+      user-select: none;
+    }
+
+    .card:hover { border-color: var(--border-hi); }
+    .card.selected { border-color: var(--green); box-shadow: 0 0 14px var(--green-soft); }
+    .card.rejected { border-color: var(--red); opacity: 0.35; }
+
+    .card img {
+      display: block;
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 4px;
+      background: var(--bg);
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+
+    .card-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 6px;
+      padding: 0 2px;
+    }
+
+    .card-info p {
+      margin: 0;
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 75%;
+    }
+
+    .card-badge {
+      font-size: 0.55rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    .card.selected .card-badge {
+      background: var(--green-soft);
+      color: var(--green);
+    }
+
+    .card.rejected .card-badge {
+      background: var(--red-soft);
+      color: var(--red);
+    }
+
+    .empty {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty h2 {
+      font-family: "Silkscreen", cursive;
+      font-size: 0.9rem;
+      color: var(--text-dim);
+      margin: 0 0 8px;
+    }
+  </style>
+</head>
+<body>
+  <nav class="topbar">
+    <div class="brand">FalSprite <span>/ select</span></div>
+    <div class="toolbar">
+      <span id="count" class="count">loading...</span>
+      <button onclick="selectAll()">ALL</button>
+      <button onclick="deselectAll()">NONE</button>
+      <button onclick="invertSelection()">INVERT</button>
+      <button class="btn-save" onclick="saveSelection()">SAVE SELECTION</button>
+    </div>
+  </nav>
+
+  <div class="pagination">
+    <button id="prevBtn" onclick="goPage(-1)">PREV</button>
+    <span id="pageInfo" class="page-info">-</span>
+    <button id="nextBtn" onclick="goPage(1)">NEXT</button>
+  </div>
+
+  <div id="grid" class="grid"></div>
+  <div id="toast" class="toast">Saved!</div>
+
+  <script>
+    const PER_PAGE = 24;
+
+    let allItems = [];
+    let selected = new Set();
+    let currentPage = 0;
+    let totalPages = 1;
+
+    async function init() {
+      try {
+        const res = await fetch("/showcase.json");
+        allItems = await res.json();
+      } catch {
+        allItems = [];
+      }
+
+      if (allItems.length === 0) {
+        document.getElementById("grid").innerHTML =
+          '<div class="empty"><h2>no sprites yet</h2><p>run batch-generate.mjs first</p></div>';
+        updateCount();
+        return;
+      }
+
+      totalPages = Math.ceil(allItems.length / PER_PAGE);
+
+      // Default: all selected
+      allItems.forEach((_, i) => selected.add(i));
+
+      updateCount();
+      renderPage();
+    }
+
+    function renderPage() {
+      const grid = document.getElementById("grid");
+      grid.innerHTML = "";
+
+      const start = currentPage * PER_PAGE;
+      const end = Math.min(start + PER_PAGE, allItems.length);
+
+      for (let idx = start; idx < end; idx++) {
+        const item = allItems[idx];
+        const isSelected = selected.has(idx);
+
+        const card = document.createElement("div");
+        card.className = isSelected ? "card selected" : "card rejected";
+        card.dataset.idx = idx;
+
+        const imgWrap = document.createElement("div");
+        imgWrap.style.position = "relative";
+
+        const img = document.createElement("img");
+        // Prefer GIF, then sprite sheet as static fallback
+        img.src = item.gifUrl || item.spriteUrl;
+        img.alt = item.prompt || "";
+        img.loading = "lazy";
+
+        const g = item.gridSize || 4;
+        const gridBadge = document.createElement("span");
+        gridBadge.style.cssText = "position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.7);border:1px solid rgba(255,255,255,0.12);color:#e8607a;font-family:Silkscreen,cursive;font-size:0.55rem;font-weight:700;padding:2px 6px;border-radius:3px;pointer-events:none;letter-spacing:0.06em";
+        gridBadge.textContent = `${g}x${g}`;
+
+        imgWrap.appendChild(img);
+        imgWrap.appendChild(gridBadge);
+
+        const info = document.createElement("div");
+        info.className = "card-info";
+
+        const p = document.createElement("p");
+        p.textContent = item.prompt || "";
+
+        const badge = document.createElement("span");
+        badge.className = "card-badge";
+        badge.textContent = isSelected ? "keep" : "skip";
+
+        info.appendChild(p);
+        info.appendChild(badge);
+
+        card.appendChild(imgWrap);
+        card.appendChild(info);
+        grid.appendChild(card);
+
+        card.addEventListener("click", () => toggleCard(idx, card, badge));
+      }
+
+      // Update pagination controls
+      document.getElementById("pageInfo").textContent = `${currentPage + 1} / ${totalPages}`;
+      document.getElementById("prevBtn").disabled = currentPage === 0;
+      document.getElementById("nextBtn").disabled = currentPage >= totalPages - 1;
+
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function goPage(delta) {
+      const next = currentPage + delta;
+      if (next < 0 || next >= totalPages) return;
+      currentPage = next;
+      renderPage();
+    }
+
+    function toggleCard(idx, card, badge) {
+      if (selected.has(idx)) {
+        selected.delete(idx);
+        card.className = "card rejected";
+        badge.textContent = "skip";
+      } else {
+        selected.add(idx);
+        card.className = "card selected";
+        badge.textContent = "keep";
+      }
+      updateCount();
+    }
+
+    function selectAll() {
+      allItems.forEach((_, i) => selected.add(i));
+      updateCount();
+      renderPage();
+    }
+
+    function deselectAll() {
+      selected.clear();
+      updateCount();
+      renderPage();
+    }
+
+    function invertSelection() {
+      allItems.forEach((_, i) => {
+        if (selected.has(i)) selected.delete(i);
+        else selected.add(i);
+      });
+      updateCount();
+      renderPage();
+    }
+
+    function updateCount() {
+      document.getElementById("count").textContent =
+        `${selected.size} / ${allItems.length} selected`;
+    }
+
+    async function saveSelection() {
+      const kept = allItems.filter((_, i) => selected.has(i));
+      try {
+        const res = await fetch("/api/showcase", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(kept)
+        });
+        const data = await res.json();
+        if (data.ok) showToast(`Saved ${data.count} sprites`);
+        else showToast("Error: " + (data.error || "unknown"));
+      } catch (err) {
+        showToast("Save failed: " + err.message);
+      }
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.classList.add("show");
+      setTimeout(() => el.classList.remove("show"), 2000);
+    }
+
+    init();
+  </script>
+</body>
+</html>

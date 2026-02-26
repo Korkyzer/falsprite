@@ -1,0 +1,62 @@
+[
+  {
+    "prompt": "lavender wolf archer, pastel dreamlike, isometric action RPG",
+    "gifUrl": "/showcase/001-lavender-wolf-archer-pastel-dreamlike-is.gif",
+    "gridSize": 4
+  },
+  {
+    "prompt": "bamboo panda warrior, Studio Ghibli inspired, isometric action RPG",
+    "gifUrl": "/showcase/006-bamboo-panda-warrior-studio-ghibli-inspi.gif",
+    "gridSize": 4
+  },
+  {
+    "prompt": "coral seahorse knight, clean pixel art, isometric action RPG",
+    "gifUrl": "/showcase/010-coral-seahorse-knight-clean-pixel-art-is.gif",
+    "gridSize": 4
+  },
+  {
+    "prompt": "crystal fox, neon glow, isometric action RPG",
+    "gifUrl": "/showcase/011-crystal-fox-neon-glow-isometric-action-r.gif",
+    "gridSize": 4
+  },
+  {
+    "prompt": "dancing flame sprite, retro arcade, isometric action RPG",
+    "gifUrl": "/showcase/012-dancing-flame-sprite-retro-arcade-isomet.gif",
+    "gridSize": 4
+  },
+  {
+    "prompt": "pudgy bear monk, pastel dreamlike, isometric action RPG",
+    "gifUrl": "/showcase/018-pudgy-bear-monk-pastel-dreamlike-isometr.gif",
+    "gridSize": 4
+  },
+  {
+    "prompt": "dancing flame sprite, clean pixel art, isometric action RPG",
+    "gifUrl": "/showcase/025-dancing-flame-sprite-clean-pixel-art-iso.gif",
+    "gridSize": 4
+  },
+  {
+    "prompt": "jolly mushroom knight, 8-bit classic, isometric action RPG",
+    "gifUrl": "/showcase/037-jolly-mushroom-knight-8-bit-classic-isom.gif",
+    "gridSize": 4
+  },
+  {
+    "prompt": "dancing flame sprite, chibi kawaii, isometric action RPG",
+    "gifUrl": "/showcase/040-dancing-flame-sprite-chibi-kawaii-isomet.gif",
+    "gridSize": 4
+  },
+  {
+    "prompt": "tiny samurai cat, Studio Ghibli inspired, isometric action RPG",
+    "gifUrl": "/showcase/042-tiny-samurai-cat-studio-ghibli-inspired-.gif",
+    "gridSize": 4
+  },
+  {
+    "prompt": "honey bee ranger, cozy storybook, isometric action RPG",
+    "gifUrl": "/showcase/050-honey-bee-ranger-cozy-storybook-isometri.gif",
+    "gridSize": 4
+  },
+  {
+    "prompt": "thunder puppy, hand-drawn sketch, isometric action RPG",
+    "gifUrl": "/showcase/078-thunder-puppy-hand-drawn-sketch-isometri.gif",
+    "gridSize": 6
+  }
+]
