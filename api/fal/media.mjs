@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const apiKey = (req.headers["x-fal-key"] || "").trim();
+  const apiKey = (req.headers["x-fal-key"] || process.env.FAL_KEY || "").trim();
 
   try {
     const headers = {};

@@ -1,6 +1,6 @@
 # FalSprite
 
-Game-ready sprite sheet animations from a single text prompt. Built on [fal.ai](https://fal.ai) — one API key powers everything.
+Game-ready sprite sheet animations from a single text prompt. Built on [fal.ai](https://fal.ai) + Google Gemini.
 
 ![FalSprite](https://img.shields.io/badge/powered_by-fal.ai-e8607a) ![License](https://img.shields.io/badge/license-MIT-blue)
 
@@ -8,9 +8,9 @@ Game-ready sprite sheet animations from a single text prompt. Built on [fal.ai](
 
 Type a character description, pick a grid size, choose animation actions — FalSprite generates a full sprite sheet with transparent background and animated preview.
 
-**Pipeline (all on fal.ai):**
+**Pipeline:**
 - **nano-banana-2** — image generation (sprite sheet)
-- **OpenRouter LLM** (GPT-4o-mini via fal) — intelligent prompt rewriting with character design + choreography
+- **Google Gemini 2.5 Flash-Lite** — intelligent prompt rewriting with character design + choreography
 - **BRIA** — automatic background removal
 
 ## Features
@@ -30,12 +30,15 @@ Type a character description, pick a grid size, choose animation actions — Fal
 git clone https://github.com/lovisdotio/falsprite.git
 cd falsprite
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
 Open [http://localhost:8787](http://localhost:8787)
 
-You need a **fal.ai API key** — get one at [fal.ai/dashboard/keys](https://fal.ai/dashboard/keys). That single key covers all three services (image gen, LLM, bg removal).
+Set these env vars in `.env.local`:
+- `GOOGLE_API_KEY` (for prompt enhancement via Gemini)
+- `FAL_KEY` (for nano-banana, BRIA, and media/storage access on fal.ai)
 
 ## Deploy to Vercel
 
@@ -69,7 +72,7 @@ The project includes Vercel-ready serverless functions in `api/` and static asse
 
 - **Frontend**: Vanilla JS, no framework, no build step
 - **Backend**: Node.js (native HTTP server for dev, Vercel serverless for prod)
-- **AI**: All via fal.ai APIs (nano-banana-2, OpenRouter, BRIA)
+- **AI**: fal.ai APIs (nano-banana-2, BRIA) + Google Gemini (prompt rewrite)
 - **GIF**: gif.js (browser) + gifenc (server-side batch)
 
 ## License

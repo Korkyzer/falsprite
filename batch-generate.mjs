@@ -8,14 +8,18 @@ import { writeFile, readFile, mkdir, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { config as loadEnv } from "dotenv";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+loadEnv({ path: ".env.local" });
+loadEnv();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SHOWCASE_DIR = path.join(__dirname, "public", "showcase");
 const SHOWCASE_JSON = path.join(__dirname, "public", "showcase.json");
 
 const ENDPOINT = "fal-ai/nano-banana-2";
-const REWRITE_ENDPOINT = "openrouter/router";
-const REWRITE_MODEL = "openai/gpt-4o-mini";
+const REWRITE_MODEL = "gemini-2.5-flash-lite";
 const MAX_CONCURRENT = 20;
 const POLL_INTERVAL = 2000;
 const TIMEOUT_MS = 300000;
@@ -40,7 +44,8 @@ function parseArgs() {
 }
 
 const args = parseArgs();
-const API_KEY = args.key || "";
+const API_KEY = args.key || process.env.FAL_KEY || "";
+const GOOGLE_API_KEY = (process.env.GOOGLE_API_KEY || "").trim();
 const COUNT = Math.max(1, Math.min(200, parseInt(args.count || "10", 10)));
 const GRID = Math.max(2, Math.min(6, parseInt(args.grid || "4", 10)));
 const FRESH = "fresh" in args;
@@ -48,7 +53,7 @@ const FRESH = "fresh" in args;
 const NUM_WORDS = { 2: "two", 3: "three", 4: "four", 5: "five", 6: "six" };
 
 if (!API_KEY) {
-  console.error("Usage: node batch-generate.mjs --key YOUR_FAL_KEY [--count 10] [--grid 4] [--fresh]");
+  console.error("Usage: node batch-generate.mjs --key YOUR_FAL_KEY [--count 10] [--grid 4] [--fresh] (or set FAL_KEY)");
   process.exit(1);
 }
 
@@ -113,53 +118,29 @@ function buildRewriteSystem() {
 }
 
 async function rewritePrompt(basePrompt) {
+  if (!GOOGLE_API_KEY) return basePrompt;
+
   const w = NUM_WORDS[GRID];
-  const submit = await falRequest(
-    `https://queue.fal.run/${REWRITE_ENDPOINT}`,
-    "POST",
-    {
+  try {
+    const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
+    const model = genAI.getGenerativeModel({
       model: REWRITE_MODEL,
-      prompt: `Design the character and choreograph a ${w}-beat animation loop for: ${basePrompt}`,
-      system_prompt: buildRewriteSystem(),
-      max_tokens: 420,
-      temperature: 0.65
-    }
-  );
+      systemInstruction: buildRewriteSystem()
+    });
+    const result = await model.generateContent({
+      contents: [{
+        role: "user",
+        parts: [{ text: `Design the character and choreograph a ${w}-beat animation loop for: ${basePrompt}` }]
+      }],
+      generationConfig: { maxOutputTokens: 420, temperature: 0.65 }
+    });
 
-  if (!submit.ok) return basePrompt;
-  const requestId = submit.data?.request_id;
-  if (!requestId) return basePrompt;
-
-  const deadline = Date.now() + 120000;
-  while (Date.now() < deadline) {
-    const status = await falRequest(
-      `https://queue.fal.run/${REWRITE_ENDPOINT}/requests/${requestId}/status`,
-      "GET"
-    );
-    if (status.data?.status === "COMPLETED") break;
-    if (status.data?.status === "FAILED") return basePrompt;
-    await wait(1500);
+    const text = result?.response?.text?.() || "";
+    const cleaned = typeof text === "string" ? text.replace(/^```[a-zA-Z]*\n?/, "").replace(/```$/g, "").trim() : "";
+    return cleaned.length > 20 ? cleaned : basePrompt;
+  } catch {
+    return basePrompt;
   }
-
-  if (Date.now() >= deadline) return basePrompt;
-
-  const result = await falRequest(
-    `https://queue.fal.run/${REWRITE_ENDPOINT}/requests/${requestId}`,
-    "GET"
-  );
-
-  if (!result.ok) return basePrompt;
-
-  // Extract text from the response
-  const text =
-    result.data?.choices?.[0]?.message?.content ||
-    result.data?.output?.choices?.[0]?.message?.content ||
-    result.data?.output ||
-    result.data?.text ||
-    "";
-
-  const cleaned = typeof text === "string" ? text.replace(/^```[a-zA-Z]*\n?/, "").replace(/```$/g, "").trim() : "";
-  return cleaned.length > 20 ? cleaned : basePrompt;
 }
 
 function buildSpritePrompt(basePrompt) {

@@ -1,7 +1,6 @@
 import {
   NANO_BANANA_ENDPOINT, NANO_BANANA_EDIT_ENDPOINT, REMOVE_BG_ENDPOINT,
-  REWRITE_ENDPOINT, REWRITE_MODEL,
-  runQueuedModel, runDirectModel, extractRewrittenPrompt, extractFirstImageUrl,
+  runQueuedModel, runDirectModel, runGeminiRewrite, extractRewrittenPrompt, extractFirstImageUrl,
   pickErrorMessage, buildSpritePrompt, buildRewriteSystemPrompt,
   makeDefaultPrompt, validateHttpUrl
 } from "../lib/fal.mjs";
@@ -13,7 +12,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
 
   const body = req.body || {};
-  const apiKey = (req.headers["x-fal-key"] || body.apiKey || "").trim();
+  const apiKey = (req.headers["x-fal-key"] || body.apiKey || process.env.FAL_KEY || "").trim();
   if (!apiKey) { res.status(400).json({ error: "Missing FAL API key" }); return; }
 
   const originalPrompt = (typeof body.prompt === "string" && body.prompt.trim()) ? body.prompt.trim() : makeDefaultPrompt();
@@ -23,13 +22,11 @@ export default async function handler(req, res) {
   let rewrittenPrompt = originalPrompt;
 
   // LLM rewrite
-  const rewriteResult = await runQueuedModel(apiKey, REWRITE_ENDPOINT, {
-    model: REWRITE_MODEL,
-    prompt: `Design the character and choreograph a ${gridWord}-beat animation loop for: ${originalPrompt}`,
-    system_prompt: buildRewriteSystemPrompt(gridSize),
-    max_tokens: 420,
-    temperature: 0.65
-  }, 120000);
+  const rewriteResult = await runGeminiRewrite(
+    `Design the character and choreograph a ${gridWord}-beat animation loop for: ${originalPrompt}`,
+    buildRewriteSystemPrompt(gridSize),
+    { maxOutputTokens: 420, temperature: 0.65 }
+  );
 
   if (rewriteResult.ok) {
     const candidate = extractRewrittenPrompt(rewriteResult.data);

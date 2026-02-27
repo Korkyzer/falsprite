@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
 
   const body = req.body || {};
-  const apiKey = (req.headers["x-fal-key"] || body.apiKey || "").trim();
+  const apiKey = (req.headers["x-fal-key"] || body.apiKey || process.env.FAL_KEY || "").trim();
   if (!apiKey) { res.status(400).json({ error: "Missing FAL API key" }); return; }
 
   const { data, contentType, filename } = body;

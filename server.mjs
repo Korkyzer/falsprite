@@ -2,13 +2,16 @@ import { createServer } from "node:http";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { config as loadEnv } from "dotenv";
 import {
   NANO_BANANA_ENDPOINT, NANO_BANANA_EDIT_ENDPOINT, REMOVE_BG_ENDPOINT,
-  REWRITE_ENDPOINT, REWRITE_MODEL,
-  runQueuedModel, runDirectModel, extractRewrittenPrompt, extractFirstImageUrl,
+  runQueuedModel, runDirectModel, runGeminiRewrite, extractRewrittenPrompt, extractFirstImageUrl,
   pickErrorMessage, buildSpritePrompt, buildRewriteSystemPrompt,
   makeDefaultPrompt, uploadToFalStorage, validateHttpUrl
 } from "./lib/fal.mjs";
+
+loadEnv({ path: ".env.local" });
+loadEnv();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -65,7 +68,7 @@ async function parseJsonBody(req) {
 }
 
 function getApiKey(req, body = {}) {
-  return (req.headers["x-fal-key"] || body?.apiKey || "").toString().trim();
+  return (req.headers["x-fal-key"] || body?.apiKey || process.env.FAL_KEY || "").toString().trim();
 }
 
 // ── Handlers ────────────────────────────────────
@@ -103,13 +106,11 @@ async function handleGenerate(req, res) {
   let rewrittenPrompt = originalPrompt;
 
   // LLM rewrite
-  const rewriteResult = await runQueuedModel(apiKey, REWRITE_ENDPOINT, {
-    model: REWRITE_MODEL,
-    prompt: `Design the character and choreograph a ${gridWord}-beat animation loop for: ${originalPrompt}`,
-    system_prompt: buildRewriteSystemPrompt(gridSize),
-    max_tokens: 420,
-    temperature: 0.65
-  }, 120000);
+  const rewriteResult = await runGeminiRewrite(
+    `Design the character and choreograph a ${gridWord}-beat animation loop for: ${originalPrompt}`,
+    buildRewriteSystemPrompt(gridSize),
+    { maxOutputTokens: 420, temperature: 0.65 }
+  );
 
   if (rewriteResult.ok) {
     const candidate = extractRewrittenPrompt(rewriteResult.data);

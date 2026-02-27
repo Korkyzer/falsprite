@@ -8,6 +8,8 @@
     "start": "node server.mjs"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "dotenv": "^17.3.1",
     "gifenc": "^1.0.3",
     "sharp": "^0.34.5"
   }

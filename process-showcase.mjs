@@ -9,9 +9,13 @@ import { writeFile, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { config as loadEnv } from "dotenv";
 import sharp from "sharp";
 import pkg from "gifenc";
 const { GIFEncoder, quantize, applyPalette } = pkg;
+
+loadEnv({ path: ".env.local" });
+loadEnv();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SHOWCASE_DIR = path.join(__dirname, "public", "showcase");
@@ -40,13 +44,13 @@ function parseArgs() {
 }
 
 const args = parseArgs();
-const API_KEY = args.key || "";
+const API_KEY = args.key || process.env.FAL_KEY || "";
 const CONCURRENCY = Math.max(1, Math.min(10, parseInt(args.concurrency || "5", 10)));
 const FRAME_SIZE = Math.max(64, Math.min(512, parseInt(args["gif-size"] || "200", 10)));
 const REGEN_GIF = "regen-gif" in args;
 
 if (!API_KEY) {
-  console.error("Usage: node process-showcase.mjs --key YOUR_FAL_KEY [--concurrency 5] [--gif-size 200]");
+  console.error("Usage: node process-showcase.mjs --key YOUR_FAL_KEY [--concurrency 5] [--gif-size 200] (or set FAL_KEY)");
   process.exit(1);
 }
 
