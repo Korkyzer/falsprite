@@ -9,9 +9,9 @@ Game-ready sprite sheet animations from a single text prompt. Built on [fal.ai](
 Type a character description, pick a grid size, choose animation actions — FalSprite generates a full sprite sheet with transparent background and animated preview.
 
 **Pipeline:**
-- **nano-banana-2** — image generation (sprite sheet)
 - **Google Gemini 2.5 Flash-Lite** — intelligent prompt rewriting with character design + choreography
-- **BRIA** — automatic background removal
+- **Google Gemini 2.5 Flash Image** — sprite sheet image generation (with optional reference image)
+- **fal.ai BRIA** — automatic background removal
 
 ## Features
 
@@ -37,8 +37,8 @@ npm run dev
 Open [http://localhost:8787](http://localhost:8787)
 
 Set these env vars in `.env.local`:
-- `GOOGLE_API_KEY` (for prompt enhancement via Gemini)
-- `FAL_KEY` (for nano-banana, BRIA, and media/storage access on fal.ai)
+- `GOOGLE_API_KEY` (for prompt enhancement + sprite generation via Gemini)
+- `FAL_KEY` (for BRIA background removal on fal.ai)
 
 ## Deploy to Vercel
 
@@ -72,7 +72,7 @@ The project includes Vercel-ready serverless functions in `api/` and static asse
 
 - **Frontend**: Vanilla JS, no framework, no build step
 - **Backend**: Node.js (native HTTP server for dev, Vercel serverless for prod)
-- **AI**: fal.ai APIs (nano-banana-2, BRIA) + Google Gemini (prompt rewrite)
+- **AI**: Google Gemini (rewrite + sprite generation) + fal.ai BRIA (background removal)
 - **GIF**: gif.js (browser) + gifenc (server-side batch)
 
 ## License

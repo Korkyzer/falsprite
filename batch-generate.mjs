@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // ─────────────────────────────────────────────────
 // FalSprite batch generator
-// Usage: node batch-generate.mjs --key YOUR_FAL_KEY [--count 10]
+// Usage: node batch-generate.mjs [--count 10] [--grid 4] [--fresh]
 // ─────────────────────────────────────────────────
 
 import { writeFile, readFile, mkdir, rm } from "node:fs/promises";
@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadEnv } from "dotenv";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { runGeminiSprite } from "./lib/fal.mjs";
 
 loadEnv({ path: ".env.local" });
 loadEnv();
@@ -18,11 +19,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SHOWCASE_DIR = path.join(__dirname, "public", "showcase");
 const SHOWCASE_JSON = path.join(__dirname, "public", "showcase.json");
 
-const ENDPOINT = "fal-ai/nano-banana-2";
 const REWRITE_MODEL = "gemini-2.5-flash-lite";
 const MAX_CONCURRENT = 20;
-const POLL_INTERVAL = 2000;
-const TIMEOUT_MS = 300000;
 
 // ── CLI args ──────────────────────────────────
 
@@ -44,7 +42,6 @@ function parseArgs() {
 }
 
 const args = parseArgs();
-const API_KEY = args.key || process.env.FAL_KEY || "";
 const GOOGLE_API_KEY = (process.env.GOOGLE_API_KEY || "").trim();
 const COUNT = Math.max(1, Math.min(200, parseInt(args.count || "10", 10)));
 const GRID = Math.max(2, Math.min(6, parseInt(args.grid || "4", 10)));
@@ -52,8 +49,8 @@ const FRESH = "fresh" in args;
 
 const NUM_WORDS = { 2: "two", 3: "three", 4: "four", 5: "five", 6: "six" };
 
-if (!API_KEY) {
-  console.error("Usage: node batch-generate.mjs --key YOUR_FAL_KEY [--count 10] [--grid 4] [--fresh] (or set FAL_KEY)");
+if (!GOOGLE_API_KEY) {
+  console.error("Usage: set GOOGLE_API_KEY (in .env.local) then run node batch-generate.mjs [--count 10] [--grid 4] [--fresh]");
   process.exit(1);
 }
 
@@ -177,112 +174,16 @@ function buildSpritePrompt(basePrompt) {
   ].join("\n");
 }
 
-// ── FAL API helpers ───────────────────────────
-
-async function falRequest(url, method, body) {
-  const res = await fetch(url, {
-    method,
-    headers: {
-      "Authorization": `Key ${API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: body ? JSON.stringify(body) : undefined
-  });
-  const text = await res.text();
-  let data;
-  try { data = JSON.parse(text); } catch { data = { raw: text }; }
-  return { ok: res.ok, status: res.status, data };
-}
-
-function wait(ms) {
-  return new Promise(r => setTimeout(r, ms));
-}
-
 async function generateSprite(prompt) {
   const fullPrompt = buildSpritePrompt(prompt);
-
-  // Submit to queue
-  const submit = await falRequest(
-    `https://queue.fal.run/${ENDPOINT}`,
-    "POST",
-    {
-      prompt: fullPrompt,
-      aspect_ratio: "1:1",
-      resolution: "2K",
-      num_images: 1,
-      output_format: "png",
-      safety_tolerance: 2,
-      expand_prompt: true
-    }
-  );
-
-  if (!submit.ok) {
-    throw new Error(`Submit failed (${submit.status}): ${JSON.stringify(submit.data)}`);
+  const spriteResult = await runGeminiSprite(fullPrompt);
+  if (!spriteResult.ok) {
+    const msg = spriteResult.data?.error || `Generation failed (${spriteResult.status})`;
+    throw new Error(msg);
   }
-
-  const requestId = submit.data?.request_id;
-  if (!requestId) throw new Error("No request_id from queue");
-
-  // Poll for completion
-  const deadline = Date.now() + TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const status = await falRequest(
-      `https://queue.fal.run/${ENDPOINT}/requests/${requestId}/status`,
-      "GET"
-    );
-
-    if (status.data?.status === "COMPLETED") break;
-    if (status.data?.status === "FAILED") {
-      throw new Error(`Generation failed: ${JSON.stringify(status.data)}`);
-    }
-
-    await wait(POLL_INTERVAL);
-  }
-
-  if (Date.now() >= deadline) throw new Error("Timeout waiting for generation");
-
-  // Get result
-  const result = await falRequest(
-    `https://queue.fal.run/${ENDPOINT}/requests/${requestId}`,
-    "GET"
-  );
-
-  if (!result.ok) throw new Error(`Result fetch failed (${result.status})`);
-
-  // Extract image URL
-  const imageUrl = findImageUrl(result.data);
-  if (!imageUrl) throw new Error("No image URL in result");
-
-  return imageUrl;
-}
-
-function findImageUrl(data) {
-  if (data?.images?.[0]?.url) return data.images[0].url;
-  if (data?.image?.url) return data.image.url;
-
-  const stack = [data];
-  while (stack.length) {
-    const node = stack.pop();
-    if (!node || typeof node !== "object") continue;
-    for (const [key, val] of Object.entries(node)) {
-      if (typeof val === "string" && val.startsWith("https") &&
-          /\.(png|jpg|jpeg|webp)(\?|$)/i.test(val)) {
-        return val;
-      }
-      if (val && typeof val === "object") stack.push(val);
-    }
-  }
-  return "";
-}
-
-async function downloadImage(url, filepath) {
-  const res = await fetch(url, {
-    headers: { "Authorization": `Key ${API_KEY}` }
-  });
-  if (!res.ok) throw new Error(`Download failed (${res.status})`);
-  const buffer = Buffer.from(await res.arrayBuffer());
-  await writeFile(filepath, buffer);
-  return buffer.length;
+  const data = spriteResult.data?.image?.data;
+  if (typeof data !== "string" || !data) throw new Error("No image data in result");
+  return Buffer.from(data, "base64");
 }
 
 // ── Main ──────────────────────────────────────
@@ -333,8 +234,9 @@ async function main() {
         // Rewrite prompt via LLM
         const rewritten = await rewritePrompt(prompt);
 
-        const imageUrl = await generateSprite(rewritten);
-        const bytes = await downloadImage(imageUrl, filepath);
+        const imageBuffer = await generateSprite(rewritten);
+        await writeFile(filepath, imageBuffer);
+        const bytes = imageBuffer.length;
         completed++;
         console.log(` ✓ ${(bytes / 1024).toFixed(0)}KB`);
 

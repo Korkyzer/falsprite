@@ -55,38 +55,14 @@ if (!API_KEY) {
 }
 
 // ── FAL API helpers ───────────────────────────
-
-async function uploadToFalStorage(buffer, contentType, filename) {
-  const initRes = await fetch("https://rest.alpha.fal.ai/storage/upload/initiate", {
-    method: "POST",
-    headers: {
-      "Authorization": `Key ${API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ file_name: filename, content_type: contentType })
-  });
-
-  if (!initRes.ok) throw new Error(`Storage initiate failed (${initRes.status})`);
-  const { upload_url, file_url } = await initRes.json();
-
-  const putRes = await fetch(upload_url, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: buffer
-  });
-
-  if (!putRes.ok) throw new Error(`Storage PUT failed (${putRes.status})`);
-  return file_url;
-}
-
-async function removeBackground(imageUrl) {
+async function removeBackground(imageInput) {
   const res = await fetch(`https://fal.run/${REMOVE_BG_ENDPOINT}`, {
     method: "POST",
     headers: {
       "Authorization": `Key ${API_KEY}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ image_url: imageUrl })
+    body: JSON.stringify({ image_url: imageInput })
   });
 
   const text = await res.text();
@@ -225,13 +201,11 @@ async function processItem(item, idx, total) {
     process.stdout.write(`  [${idx + 1}/${total}] ${label}... cached→`);
     transparentBuffer = await readFile(transparentFile);
   } else {
-    process.stdout.write(`  [${idx + 1}/${total}] ${label}... upload→`);
+    process.stdout.write(`  [${idx + 1}/${total}] ${label}... bria→`);
 
     const spriteBuffer = await readFile(spriteFile);
-    const remoteUrl = await uploadToFalStorage(spriteBuffer, "image/png", path.basename(spriteFile));
-
-    process.stdout.write("bria→");
-    const transparentRemoteUrl = await removeBackground(remoteUrl);
+    const spriteDataUrl = `data:image/png;base64,${spriteBuffer.toString("base64")}`;
+    const transparentRemoteUrl = await removeBackground(spriteDataUrl);
 
     process.stdout.write("download→");
     transparentBuffer = await downloadImage(transparentRemoteUrl);

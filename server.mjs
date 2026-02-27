@@ -4,10 +4,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadEnv } from "dotenv";
 import {
-  NANO_BANANA_ENDPOINT, NANO_BANANA_EDIT_ENDPOINT, REMOVE_BG_ENDPOINT,
-  runQueuedModel, runDirectModel, runGeminiRewrite, extractRewrittenPrompt, extractFirstImageUrl,
+  REMOVE_BG_ENDPOINT,
+  runDirectModel, runGeminiRewrite, runGeminiSprite, extractRewrittenPrompt, extractFirstImageUrl,
   pickErrorMessage, buildSpritePrompt, buildRewriteSystemPrompt,
-  makeDefaultPrompt, uploadToFalStorage, validateHttpUrl
+  makeDefaultPrompt, validateHttpUrl
 } from "./lib/fal.mjs";
 
 loadEnv({ path: ".env.local" });
@@ -16,7 +16,7 @@ loadEnv();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number.parseInt(process.env.PORT || "8787", 10);
-const MAX_BODY_BYTES = 2 * 1024 * 1024;
+const MAX_BODY_BYTES = 12 * 1024 * 1024;
 
 const NUM_WORDS = { 2: "two", 3: "three", 4: "four", 5: "five", 6: "six" };
 
@@ -53,12 +53,18 @@ async function parseJsonBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let totalBytes = 0;
+    let tooLarge = false;
     req.on("data", (chunk) => {
+      if (tooLarge) return;
       totalBytes += chunk.length;
-      if (totalBytes > MAX_BODY_BYTES) { reject(new Error("Payload too large")); req.destroy(); return; }
+      if (totalBytes > MAX_BODY_BYTES) {
+        tooLarge = true;
+        return;
+      }
       chunks.push(chunk);
     });
     req.on("end", () => {
+      if (tooLarge) { reject(new Error("Payload too large")); return; }
       if (chunks.length === 0) { resolve({}); return; }
       try { resolve(JSON.parse(Buffer.concat(chunks).toString("utf-8"))); }
       catch { reject(new Error("Invalid JSON")); }
@@ -77,15 +83,13 @@ async function handleUpload(req, res) {
   let body;
   try { body = await parseJsonBody(req); } catch (e) { sendJson(res, 400, { error: e.message }); return; }
 
-  const apiKey = getApiKey(req, body);
-  if (!apiKey) { sendJson(res, 400, { error: "Missing FAL API key" }); return; }
-
-  const { data, contentType, filename } = body;
+  const { data, contentType } = body;
   if (!data || !contentType) { sendJson(res, 400, { error: "Missing data or contentType" }); return; }
 
   try {
-    const buffer = Buffer.from(data, "base64");
-    const url = await uploadToFalStorage(apiKey, buffer, contentType, filename || "upload.png");
+    const safeMimeType = String(contentType || "image/png").trim();
+    const safeData = String(data || "").trim();
+    const url = `data:${safeMimeType};base64,${safeData}`;
     sendJson(res, 200, { url });
   } catch (e) {
     sendJson(res, 502, { error: e.message });
@@ -96,10 +100,16 @@ async function handleGenerate(req, res) {
   let body;
   try { body = await parseJsonBody(req); } catch (e) { sendJson(res, 400, { error: e.message }); return; }
 
-  const apiKey = getApiKey(req, body);
-  if (!apiKey) { sendJson(res, 400, { error: "Missing FAL API key" }); return; }
+  const falKey = getApiKey(req, body);
+  const referenceImageInput = typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
+  const hasReferenceImage = referenceImageInput.length > 0;
+  const userPrompt = (typeof body.prompt === "string" && body.prompt.trim()) ? body.prompt.trim() : "";
 
-  const originalPrompt = (typeof body.prompt === "string" && body.prompt.trim()) ? body.prompt.trim() : makeDefaultPrompt();
+  const originalPrompt = userPrompt
+    ? userPrompt
+    : (hasReferenceImage
+      ? ""
+      : makeDefaultPrompt());
   const gridSize = Math.max(2, Math.min(6, parseInt(body.gridSize, 10) || 4));
   const gridWord = NUM_WORDS[gridSize] || "four";
   const warnings = [];
@@ -107,9 +117,18 @@ async function handleGenerate(req, res) {
 
   // LLM rewrite
   const rewriteResult = await runGeminiRewrite(
-    `Design the character and choreograph a ${gridWord}-beat animation loop for: ${originalPrompt}`,
+    hasReferenceImage
+      ? (userPrompt
+        ? `Analyze the provided reference image first, then design the character and choreograph a ${gridWord}-beat animation loop. Keep identity, outfit, silhouette, and palette grounded in the reference. Extra user direction: ${userPrompt}`
+        : `Analyze the provided reference image first, then design the character and choreograph a ${gridWord}-beat animation loop. Keep identity, outfit, silhouette, and palette grounded in the reference.`)
+      : `Design the character and choreograph a ${gridWord}-beat animation loop for: ${originalPrompt}`,
     buildRewriteSystemPrompt(gridSize),
-    { maxOutputTokens: 420, temperature: 0.65 }
+    {
+      maxOutputTokens: 420,
+      temperature: 0.65,
+      referenceImageInput,
+      falApiKey: falKey
+    }
   );
 
   if (rewriteResult.ok) {
@@ -121,22 +140,18 @@ async function handleGenerate(req, res) {
   }
 
   // Sprite generation
-  const spritePrompt = buildSpritePrompt(rewrittenPrompt, gridSize);
-  const referenceImageUrl = typeof body.imageUrl === "string" && validateHttpUrl(body.imageUrl) ? body.imageUrl : "";
-
-  const spriteInput = referenceImageUrl
-    ? { prompt: spritePrompt, image_urls: [referenceImageUrl], aspect_ratio: "1:1", resolution: "2K", num_images: 1, output_format: "png", safety_tolerance: 2 }
-    : { prompt: spritePrompt, aspect_ratio: "1:1", resolution: "2K", num_images: 1, output_format: "png", safety_tolerance: 2, expand_prompt: true };
-
-  const spriteEndpoint = referenceImageUrl ? NANO_BANANA_EDIT_ENDPOINT : NANO_BANANA_ENDPOINT;
-  const spriteResult = await runQueuedModel(apiKey, spriteEndpoint, spriteInput, 240000);
+  const spritePromptBase = buildSpritePrompt(rewrittenPrompt, gridSize);
+  const spritePrompt = hasReferenceImage
+    ? `${spritePromptBase}\n\nREFERENCE IMAGE REQUIREMENT: The uploaded reference image is the source of truth for character identity, proportions, outfit, and color palette. Keep these traits consistent in every cell while animating this same character.`
+    : spritePromptBase;
+  const spriteResult = await runGeminiSprite(spritePrompt, referenceImageInput, falKey);
 
   if (!spriteResult.ok) {
     sendJson(res, spriteResult.status, { error: pickErrorMessage(spriteResult.data, "Sprite generation failed"), warnings });
     return;
   }
 
-  const spriteUrl = extractFirstImageUrl(spriteResult.data);
+  const spriteUrl = typeof spriteResult.data?.image?.url === "string" ? spriteResult.data.image.url : "";
   if (!spriteUrl) {
     sendJson(res, 502, { error: "No image URL in sprite result", warnings });
     return;
@@ -144,12 +159,16 @@ async function handleGenerate(req, res) {
 
   // Background removal
   let transparentSpriteUrl = "";
-  const removeBgResult = await runDirectModel(apiKey, REMOVE_BG_ENDPOINT, { image_url: spriteUrl });
-  if (removeBgResult.ok) {
-    transparentSpriteUrl = extractFirstImageUrl(removeBgResult.data);
-    if (!transparentSpriteUrl) warnings.push("BG removal succeeded but no output URL.");
+  if (falKey) {
+    const removeBgResult = await runDirectModel(falKey, REMOVE_BG_ENDPOINT, { image_url: spriteUrl });
+    if (removeBgResult.ok) {
+      transparentSpriteUrl = extractFirstImageUrl(removeBgResult.data);
+      if (!transparentSpriteUrl) warnings.push("BG removal succeeded but no output URL.");
+    } else {
+      warnings.push(`BG removal skipped: ${pickErrorMessage(removeBgResult.data, "BRIA failed")}`);
+    }
   } else {
-    warnings.push(`BG removal skipped: ${pickErrorMessage(removeBgResult.data, "BRIA failed")}`);
+    warnings.push("BG removal skipped: missing FAL_KEY.");
   }
 
   sendJson(res, 200, {

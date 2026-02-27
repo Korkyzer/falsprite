@@ -37,7 +37,6 @@ const elements = {
   heroBadgeGrid: document.querySelector("#heroBadgeGrid"),
   pipelineText: document.querySelector("#pipelineText"),
   promptInput: document.querySelector("#promptInput"),
-  apiKeyInput: document.querySelector("#apiKeyInput"),
   gridSelect: document.querySelector("#gridSelect"),
   generateButton: document.querySelector("#generateButton"),
   surpriseButton: document.querySelector("#surpriseButton"),
@@ -86,7 +85,6 @@ const state = {
 const previewCtx = elements.previewCanvas.getContext("2d", { alpha: false });
 previewCtx.imageSmoothingEnabled = false;
 
-restoreApiKey();
 setStatus("Ready.");
 drawPlaceholder();
 wireEvents();
@@ -104,13 +102,6 @@ function wireEvents() {
   elements.removeImageButton.addEventListener("click", onRemoveImage);
   elements.gridSelect.addEventListener("change", onGridChange);
   elements.previewCanvas.addEventListener("click", onPreviewClick);
-  elements.apiKeyInput.addEventListener("change", () => {
-    const val = elements.apiKeyInput.value.trim();
-    if (val) {
-      rememberApiKey(val);
-      showKeySaved();
-    }
-  });
 
   // Action chips — multi-select, max = grid rows
   document.querySelectorAll(".action-chip").forEach(chip => {
@@ -190,29 +181,10 @@ async function onImageSelected() {
   const file = elements.imageFileInput.files[0];
   if (!file) return;
 
-  const apiKey = elements.apiKeyInput.value.trim();
-  if (!apiKey) {
-    setStatus("Enter your FAL key first.", "error");
-    elements.imageFileInput.value = "";
-    return;
-  }
-
-  setStatus("Uploading reference image...");
+  setStatus("Preparing reference image...");
 
   try {
-    const base64 = await fileToBase64(file);
-    const res = await callJson("/api/upload", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        apiKey,
-        data: base64,
-        contentType: file.type,
-        filename: file.name
-      })
-    });
-
-    state.current.referenceImageUrl = res.url;
+    state.current.referenceImageUrl = await fileToDataUrl(file);
 
     const localUrl = URL.createObjectURL(file);
     trackObjectUrl(localUrl);
@@ -221,7 +193,8 @@ async function onImageSelected() {
 
     setStatus("Reference image ready. Generate when ready.", "success");
   } catch (error) {
-    setStatus(`Upload failed: ${error.message}`, "error");
+    const msg = String(error?.message || "Unknown error");
+    setStatus(`Upload failed: ${msg}. If this is a large image, try a smaller file.`, "error");
   }
 
   elements.imageFileInput.value = "";
@@ -234,34 +207,15 @@ function onRemoveImage() {
   setStatus("ready");
 }
 
-function fileToBase64(file) {
+function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
-      const result = reader.result;
-      const base64 = result.split(",")[1];
-      resolve(base64);
+      resolve(String(reader.result || ""));
     };
     reader.onerror = () => reject(new Error("File read failed"));
     reader.readAsDataURL(file);
   });
-}
-
-function restoreApiKey() {
-  const remembered = window.localStorage.getItem("fal_api_key") || "";
-  if (remembered) {
-    elements.apiKeyInput.value = remembered;
-    showKeySaved();
-  }
-}
-
-function showKeySaved() {
-  const badge = document.getElementById("keySaved");
-  if (badge) badge.classList.remove("hidden");
-}
-
-function rememberApiKey(value) {
-  window.localStorage.setItem("fal_api_key", value);
 }
 
 function setStatus(message, mode = "") {
@@ -333,19 +287,13 @@ async function onGenerate() {
     return;
   }
 
-  const apiKey = elements.apiKeyInput.value.trim();
-  if (!apiKey) {
-    setStatus("Missing FAL API key.", "error");
-    return;
-  }
-
+  const hasReferenceImage = Boolean(state.current.referenceImageUrl);
   let prompt = elements.promptInput.value.trim();
-  if (!prompt) {
+  if (!prompt && !hasReferenceImage) {
     prompt = randomPrompt();
     elements.promptInput.value = prompt;
   }
 
-  rememberApiKey(apiKey);
   const gridSize = getGridSize();
   state.current.gridSize = gridSize;
   state.generating = true;
@@ -365,8 +313,10 @@ async function onGenerate() {
 
   try {
     const action = getSelectedAction();
-    const fullPrompt = action ? `${prompt} — animation: ${action}` : prompt;
-    const payload = { apiKey, prompt: fullPrompt, gridSize };
+    const fullPrompt = action
+      ? (prompt ? `${prompt} — animation: ${action}` : `animation: ${action}`)
+      : prompt;
+    const payload = { prompt: fullPrompt, gridSize };
     if (state.current.referenceImageUrl) {
       payload.imageUrl = state.current.referenceImageUrl;
     }
@@ -393,7 +343,7 @@ async function onGenerate() {
       throw new Error("No sprite URL returned.");
     }
 
-    await loadPreviewImage(previewSourceUrl, apiKey);
+    await loadPreviewImage(previewSourceUrl);
 
     showCanvasLoader(false);
     state.preview.playing = true;
@@ -419,8 +369,8 @@ function toggleGenerateUI(disabled) {
   elements.promptInput.disabled = disabled;
 }
 
-async function loadPreviewImage(url, apiKey) {
-  const blob = await fetchMediaBlob(url, apiKey);
+async function loadPreviewImage(url) {
+  const blob = await fetchMediaBlob(url);
   const objectUrl = URL.createObjectURL(blob);
   trackObjectUrl(objectUrl);
 
@@ -720,14 +670,8 @@ function resetGifCache() {
 }
 
 async function downloadFromFalUrl(url, filename) {
-  const apiKey = elements.apiKeyInput.value.trim();
-  if (!apiKey) {
-    setStatus("Missing FAL API key.", "error");
-    return;
-  }
-
   try {
-    const blob = await fetchMediaBlob(url, apiKey);
+    const blob = await fetchMediaBlob(url);
     const objectUrl = URL.createObjectURL(blob);
     trackObjectUrl(objectUrl);
     triggerDownload(objectUrl, filename);
@@ -744,12 +688,14 @@ function triggerDownload(objectUrl, filename) {
   anchor.click();
 }
 
-async function fetchMediaBlob(url, apiKey) {
-  const response = await fetch(`/api/fal/media?url=${encodeURIComponent(url)}`, {
-    headers: {
-      "x-fal-key": apiKey
-    }
-  });
+async function fetchMediaBlob(url) {
+  if (typeof url === "string" && url.startsWith("data:image/")) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Data URL load failed (${response.status})`);
+    return response.blob();
+  }
+
+  const response = await fetch(`/api/fal/media?url=${encodeURIComponent(url)}`);
 
   if (!response.ok) {
     const errorPayload = await response.json().catch(() => ({}));
